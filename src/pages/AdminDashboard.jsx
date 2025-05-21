@@ -1087,6 +1087,12 @@ const AdminDashboard = () => {
   // THis is for to delete user completely from db
   const [deletedUsers, setDeletedUsers] = useState([]);
   const [deletedProjects, setDeletedProjects] = useState([]);
+   //THis is the log activity 
+   const [activityLogs, setActivityLogs] = useState([]);
+   const [currentPage, setCurrentPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1);
+const [searchTerm, setSearchTerm] = useState("");
+
 
   // Now this is the  fuctionality of the Pie chart
 
@@ -1295,14 +1301,59 @@ const AdminDashboard = () => {
     }
   };
 
+
+
+// Log Activity in the admin Dashboard
+const fetchActivityLogs = async () => {
+  const user = JSON.parse(sessionStorage.getItem("user"));
+  if (!user || !user.id || !user.role) return;
+
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/activity-log?user_id=${user.id}&role=${user.role}&page=${currentPage}&pageSize=10&search=${encodeURIComponent(searchTerm)}`,
+      {
+        method: "GET",
+        credentials: "include",
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to fetch logs");
+    }
+
+    const data = await response.json();
+    setActivityLogs(data.logs || []);
+    setTotalPages(data.totalPages || 1);
+  } catch (error) {
+    console.error("❌ Error fetching logs:", error.message);
+  }
+};
+
+
+
+
+
+
   useEffect(() => {
     if (activeTab === "dashboard") {
       fetchUsers(); // Re-fetch users when the dashboard tab is active
       fetchMembers(); // Re-fetch members when the dashboard tab is active
       fetchProjects(); // Re-fetch projects when the dashboard tab is active
-      fetchTasks(); // Re-fetch tasks when the dashboard tab is active
+      fetchTasks();
+      fetchActivityLogs(); // Re-fetch tasks when the dashboard tab is active
     }
-  }, [activeTab]);
+  }, [activeTab, currentPage, searchTerm]);
+
+
+ // ✅ Define filteredLogs safely
+ const filteredLogs = Array.isArray(activityLogs)
+ ? activityLogs.filter((log) =>
+     log.User?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     new Date(log.createdAt).toLocaleDateString().includes(searchTerm)
+   )
+ : [];
+
 
   // Project functionality of the admin dashboard
   const [members, setMembers] = useState([]);
@@ -1614,6 +1665,7 @@ const AdminDashboard = () => {
             </div>
 
             {activeTab === "dashboard" && (
+              <>
               <div className="text-4xl font-bold text-gray-800 mb-4 text-center">
                 <div className="text-4xl font-bold text-gray-800 mb-4 text-center">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 p-6">
@@ -1759,6 +1811,81 @@ const AdminDashboard = () => {
 </div> */}
                 </div>
               </div>
+              
+
+            <div className="p-4">
+      <h2 className="text-xl font-bold mb-4">Activity Logs</h2>
+
+      {/* Search Input */}
+      <input
+        type="text"
+        placeholder="Search by user or date"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="mb-4 p-2 border border-gray-300 rounded w-full"
+      />
+
+      {/* Activity Table */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white rounded shadow">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="py-2 px-4">User</th>
+              <th className="py-2 px-4">Role</th>
+              <th className="py-2 px-4">Action</th>
+              <th className="py-2 px-4">Description</th>
+              <th className="py-2 px-4">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredLogs.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="text-center py-4">
+                  No activity logs found.
+                </td>
+              </tr>
+            ) : (
+              filteredLogs.map((log) => (
+                <tr key={log.id} className="border-b hover:bg-gray-50">
+                  <td className="py-2 px-4">{log.User?.name || "Unknown"}</td>
+                  <td className="py-2 px-4 capitalize">{log.User?.role || "N/A"}</td>
+                  <td className="py-2 px-4 capitalize">{log.action_type}</td>
+                  <td className="py-2 px-4">{log.description}</td>
+                  <td className="py-2 px-4">
+                    {new Date(log.createdAt).toLocaleString()}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex justify-between items-center mt-4">
+        <button
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <span className="text-sm">
+          Page {currentPage} of {totalPages}
+        </span>
+        <button
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+             </div>
+
+
+              </>
+
             )}
 
             {showForm && (
